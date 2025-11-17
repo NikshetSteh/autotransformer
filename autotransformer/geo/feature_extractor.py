@@ -19,20 +19,28 @@ def add_geo_features(
     coord_separator: str = ";",
 ) -> pd.DataFrame:
     """
-    Универсальный интерфейс для добавления геофичей.
+    Add geographic features to a DataFrame using configured providers.
 
-    Parameters:
-        df: исходный DataFrame
-        providers: словарь вида {GeoProviderEnum.METRO: {'radii': [300, 500]}}
-        place: общий параметр местоположения (для всех провайдеров, где применимо)
-        centers: список центров [{"name": "center", "lon": 37.6, "lat": 55.7}]
-        radii: например {"subway": [500, 1000]}
-        lat_col, lon_col: названия столбцов с координатами
-        coord_col: альтернатива — один столбец с координатами (строка или список)
+    Args:
+        df: Input DataFrame with geographic coordinates.
+        providers: Dictionary mapping GeoProviderEnum (or string) to provider-specific kwargs.
+        place: Default location for providers that require a city/place.
+        centers: List of dicts [{"name": str, "lon": float, "lat": float}] for distance calculation.
+        radii: Optional dictionary of radius lists for providers (e.g., {"subway": [300, 500]}).
+        lat_col: Name of latitude column in df.
+        lon_col: Name of longitude column in df.
+        coord_col: Name of single column with coordinates (lat/lon), separated by coord_separator.
+        coord_separator: Separator used in coord_col if provided.
+
+    Returns:
+        DataFrame with added columns for each requested geo feature.
+
+    Example:
+        df = pd.DataFrame([{"lat": 55.7558, "lon": 37.6173}])
+        df = add_geo_features(df, providers={GeoProviderEnum.METRO: {}})
     """
     df = df.copy()
 
-    # --- Парсинг координат ---
     lon, lat = parse_coordinates(
         df,
         lat_col=lat_col,
@@ -50,9 +58,10 @@ def add_geo_features(
             GeoProviderEnum.TRANSPORT: {},
             GeoProviderEnum.CITY_BOUNDARY: {},
             GeoProviderEnum.DISTRICTS: {},
+            GeoProviderEnum.INTERSECTIONS: {},
+            GeoProviderEnum.INDUSTRIAL: {},
         }
 
-    # Общие параметры для всех провайдеров
     common_kwargs = {
         "place": place,
         "lon_col": "__parsed_lon__",
@@ -61,18 +70,13 @@ def add_geo_features(
         "radii": radii or {},
     }
 
-    # Запуск выбранных провайдеров
     for provider_enum, provider_params in providers.items():
-        print(provider_enum, provider_params)
         if isinstance(provider_enum, str):
             provider_enum = GeoProviderEnum(provider_enum)
         provider_class = get_provider(provider_enum)
         provider_instance = provider_class()
         full_kwargs = {**common_kwargs, **provider_params}
         df = provider_instance.apply(df, **full_kwargs)
-        print(provider_enum, provider_params)
 
-    # Убираем временные колонки
     df.drop(columns=["__parsed_lon__", "__parsed_lat__"], inplace=True)
-
     return df

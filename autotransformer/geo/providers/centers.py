@@ -8,18 +8,34 @@ from .base import GeoProvider
 
 
 class CentersProvider(GeoProvider):
+    """
+    Calculate distances from points in the DataFrame to specified centers.
+    """
+
     name = "centers"
 
     def apply(
         self,
         df: pd.DataFrame,
-        centers: Optional[list] = None,
+        centers: Optional[list[dict]] = None,
         lon_col: str = "longitude",
         lat_col: str = "latitude",
         **kwargs,
     ) -> pd.DataFrame:
         """
-        centers: list of {"name": str, "lon": float, "lat": float}
+        Args:
+            df: DataFrame with coordinates.
+            centers: List of centers [{"name": str, "lon": float, "lat": float}].
+            lon_col: Name of longitude column.
+            lat_col: Name of latitude column.
+
+        Returns:
+            DataFrame with new columns "dist_to_{center_name}" in meters.
+
+        Example:
+            df = pd.DataFrame([{"lon": 37.6173, "lat": 55.7558}])
+            provider = CentersProvider()
+            df = provider.apply(df, centers=[{"name": "kremlin", "lon": 37.6176, "lat": 55.7517}])
         """
         if not centers:
             return df
@@ -28,7 +44,6 @@ class CentersProvider(GeoProvider):
         gdf_m = gdf.to_crs("EPSG:32637")
 
         for center in centers:
-            print(center)
             name = center["name"]
             point = (
                 gpd.GeoDataFrame(
@@ -38,6 +53,5 @@ class CentersProvider(GeoProvider):
                 .geometry.iloc[0]
             )
             df[f"dist_to_{name}"] = gdf_m.distance(point)
-            print(point)
 
         return df

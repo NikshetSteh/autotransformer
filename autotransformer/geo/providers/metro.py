@@ -21,7 +21,6 @@ class MetroProvider(GeoProvider):
         lat_col: str = "latitude",
         **kwargs,
     ) -> pd.DataFrame:
-        print("A")
         if radii is None:
             radii = [500, 1000]
 
@@ -29,33 +28,34 @@ class MetroProvider(GeoProvider):
         gdf_m = gdf.to_crs("EPSG:32637")
         X_points = gdf_m.geometry.apply(lambda p: [p.x, p.y]).tolist()
 
-        # Загрузка станций метро из OSM
         try:
-            print("B")
-            subway = ox.features_from_place(place, tags={'station': 'subway'}).to_crs('EPSG:32637')
-            print("C")
+            subway = ox.features_from_place(place, tags={"station": "subway"}).to_crs(
+                "EPSG:32637"
+            )
             subway = subway[~subway.geometry.isna()]  # убираем пустые геометрии
-            print("D")
-            subway = subway[subway.geometry.type == 'Point']  # только точки
-            print("E")
+            subway = subway[subway.geometry.type == "Point"]  # только точки
         except Exception:
-            subway = gpd.GeoDataFrame(geometry=[], crs='EPSG:32637')
+            print("Cannot to load subways")
+            subway = gpd.GeoDataFrame(geometry=[], crs="EPSG:32637")
 
-        # Вычисление признаков, если станции найдены
+        subway = ox.features_from_place(place, tags={"station": "subway"}).to_crs(
+            "EPSG:32637"
+        )
+        subway = subway[~subway.geometry.isna()]
+        subway = subway[subway.geometry.type == "Point"]
+
         if len(subway) > 0:
-            print(subway)
             X_subway = subway.geometry.apply(lambda p: [p.x, p.y]).tolist()
             nbrs_subway = NearestNeighbors(n_neighbors=1).fit(X_subway)
-            df['dist_to_subway'] = nbrs_subway.kneighbors(X_points)[0].flatten()
+            df["dist_to_subway"] = nbrs_subway.kneighbors(X_points)[0].flatten()
 
-            # Количество станций в каждом заданном радиусе
             for r in radii:
                 nbrs_count = NearestNeighbors(radius=r).fit(X_subway)
                 counts = nbrs_count.radius_neighbors(X_points, return_distance=False)
-                df[f'count_subway_{r}m'] = [len(c) for c in counts]
+                df[f"count_subway_{r}m"] = [len(c) for c in counts]
         else:
-            df['dist_to_subway'] = np.nan
+            df["dist_to_subway"] = np.nan
             for r in radii:
-                df[f'count_subway_{r}m'] = 0
+                df[f"count_subway_{r}m"] = 0
 
         return df
